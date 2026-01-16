@@ -1,0 +1,196 @@
+{% extends 'reservaciones/base.html' %}
+
+{% block title %}Mis Reservaciones - ReservaYa{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white mb-8 shadow-xl">
+        <h1 class="text-3xl font-bold mb-2">Mis Reservaciones</h1>
+        <p class="text-blue-100">Gestiona todas tus reservaciones en un solo lugar</p>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+        <div class="flex flex-wrap gap-4 items-center">
+            <div class="flex-1">
+                <p class="text-gray-600">
+                    <i class="fas fa-filter mr-2"></i>
+                    Mostrando <span class="font-semibold text-gray-800">{{ reservaciones.count }}</span> reservación{{ reservaciones.count|pluralize:"es" }}
+                </p>
+            </div>
+            <div>
+                <select id="filter-estado" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="todas">Todas</option>
+                    <option value="pendiente">Pendientes</option>
+                    <option value="confirmada">Confirmadas</option>
+                    <option value="completada">Completadas</option>
+                    <option value="cancelada">Canceladas</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    {% if reservaciones %}
+        <div class="space-y-6">
+            {% for reservacion in reservaciones %}
+                <div class="reservacion-card bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden" 
+                     data-estado="{{ reservacion.estado }}">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 p-6">
+                        <!-- Servicio Info -->
+                        <div class="md:col-span-2">
+                            <div class="flex items-start space-x-4">
+                                <div class="bg-gradient-to-br from-blue-400 to-purple-500 w-20 h-20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    {% if reservacion.servicio.imagen %}
+                                        <img src="{{ reservacion.servicio.imagen.url }}" alt="{{ reservacion.servicio.nombre }}" 
+                                             class="w-full h-full object-cover rounded-lg">
+                                    {% else %}
+                                        <i class="fas fa-concierge-bell text-white text-2xl"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-bold text-gray-800 mb-2">{{ reservacion.servicio.nombre }}</h3>
+                                    <div class="space-y-1 text-sm text-gray-600">
+                                        <p><i class="fas fa-user w-4 mr-2 text-blue-500"></i>{{ reservacion.nombre_cliente }}</p>
+                                        <p><i class="fas fa-envelope w-4 mr-2 text-blue-500"></i>{{ reservacion.email_cliente }}</p>
+                                        <p><i class="fas fa-phone w-4 mr-2 text-blue-500"></i>{{ reservacion.telefono_cliente }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Fecha y Hora -->
+                        <div>
+                            <div class="bg-gray-50 rounded-lg p-4 h-full">
+                                <p class="text-sm text-gray-600 mb-2">
+                                    <i class="fas fa-calendar mr-2"></i>Fecha y Hora
+                                </p>
+                                <p class="font-semibold text-gray-800 text-lg mb-1">{{ reservacion.fecha|date:"d/m/Y" }}</p>
+                                <p class="text-gray-600">{{ reservacion.hora_inicio|time:"H:i" }} - {{ reservacion.hora_fin|time:"H:i" }}</p>
+                                <p class="text-sm text-gray-500 mt-2">
+                                    <i class="fas fa-users mr-2"></i>{{ reservacion.numero_personas }} persona{{ reservacion.numero_personas|pluralize }}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Estado y Acciones -->
+                        <div class="flex flex-col justify-between">
+                            <!-- Estado Badge -->
+                            <div class="mb-4">
+                                {% if reservacion.estado == 'pendiente' %}
+                                    <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">
+                                        <i class="fas fa-clock mr-2"></i>Pendiente
+                                    </span>
+                                {% elif reservacion.estado == 'confirmada' %}
+                                    <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+                                        <i class="fas fa-check-circle mr-2"></i>Confirmada
+                                    </span>
+                                {% elif reservacion.estado == 'completada' %}
+                                    <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
+                                        <i class="fas fa-check-double mr-2"></i>Completada
+                                    </span>
+                                {% elif reservacion.estado == 'cancelada' %}
+                                    <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-red-100 text-red-800">
+                                        <i class="fas fa-times-circle mr-2"></i>Cancelada
+                                    </span>
+                                {% endif %}
+                                
+                                <p class="text-2xl font-bold text-gray-800 mt-3">${{ reservacion.precio_total }}</p>
+                            </div>
+                            
+                            <!-- Acciones -->
+                            <div class="space-y-2">
+                                {% if reservacion.estado == 'pendiente' or reservacion.estado == 'confirmada' %}
+                                    {% if reservacion.puede_cancelar %}
+                                        <a href="{% url 'cancelar_reservacion' reservacion.id %}" 
+                                           class="block w-full text-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">
+                                            <i class="fas fa-times mr-2"></i>Cancelar
+                                        </a>
+                                    {% else %}
+                                        <button disabled 
+                                                class="block w-full text-center px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed text-sm font-medium">
+                                            <i class="fas fa-lock mr-2"></i>No Cancelable
+                                        </button>
+                                    {% endif %}
+                                {% endif %}
+                                
+                                <button onclick="verDetalles({{ reservacion.id }})" 
+                                        class="block w-full text-center px-4 py-2 border-2 border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium">
+                                    <i class="fas fa-info-circle mr-2"></i>Ver Detalles
+                                </button>
+                                
+                            </div>
+                            <div class="space-y-2">
+                            {% if reservacion.estado_pago != 'pagado' %}
+                                {% if reservacion.estado == 'pendiente' or reservacion.estado == 'confirmada' %}
+                                    <a href="{% url 'procesar_pago' reservacion.id %}" 
+                                    class="block w-full text-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium">
+                                        <i class="fas fa-credit-card mr-2"></i>Pagar Ahora
+                                    </a>
+                                {% endif %}
+                            {% else %}
+                                <div class="block w-full text-center px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
+                                    <i class="fas fa-check-circle mr-2"></i>Pagado
+                                </div>
+                            {% endif %}
+                            
+                            {% if reservacion.estado == 'pendiente' or reservacion.estado == 'confirmada' %}
+                                {% if reservacion.puede_cancelar %}
+                                    <a href="{% url 'cancelar_reservacion' reservacion.id %}" 
+                                    class="block w-full text-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">
+                                        <i class="fas fa-times mr-2"></i>Cancelar
+                                    </a>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                        </div>
+                    </div>
+                    
+                    {% if reservacion.notas %}
+                        <div class="bg-gray-50 px-6 py-4 border-t">
+                            <p class="text-sm text-gray-600">
+                                <i class="fas fa-comment-alt mr-2"></i><strong>Notas:</strong> {{ reservacion.notas }}
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <!-- Empty State -->
+        <div class="bg-white rounded-xl shadow-md p-12 text-center">
+            <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-blue-100 mb-6">
+                <i class="fas fa-calendar-times text-blue-500 text-4xl"></i>
+            </div>
+            <h3 class="text-2xl font-semibold text-gray-700 mb-3">No tienes reservaciones</h3>
+            <p class="text-gray-500 mb-6">¡Comienza reservando tu primer servicio!</p>
+            <a href="{% url 'lista_servicios' %}" 
+               class="inline-block bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200">
+                <i class="fas fa-search mr-2"></i>Explorar Servicios
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    // Filtro por estado
+    document.getElementById('filter-estado').addEventListener('change', function() {
+        const estado = this.value;
+        const cards = document.querySelectorAll('.reservacion-card');
+        
+        cards.forEach(card => {
+            if (estado === 'todas' || card.dataset.estado === estado) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+    
+    // Función para ver detalles (puedes expandir esto)
+    function verDetalles(reservacionId) {
+        alert('Modal de detalles - ID: ' + reservacionId);
+        // Aquí puedes implementar un modal con más detalles
+    }
+</script>
+{% endblock %}

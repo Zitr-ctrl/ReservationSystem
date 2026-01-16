@@ -1,0 +1,312 @@
+{% extends 'reservaciones/base.html' %}
+
+{% block title %}Reservar {{ servicio.nombre }} - ReservaYa{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Breadcrumb -->
+    <nav class="mb-8">
+        <ol class="flex items-center space-x-2 text-gray-600">
+            <li><a href="{% url 'lista_servicios' %}" class="hover:text-blue-600"><i class="fas fa-home"></i></a></li>
+            <li><i class="fas fa-chevron-right text-sm"></i></li>
+            <li><a href="{% url 'lista_servicios' %}" class="hover:text-blue-600">Servicios</a></li>
+            <li><i class="fas fa-chevron-right text-sm"></i></li>
+            <li><a href="{% url 'detalle_servicio' servicio.id %}" class="hover:text-blue-600">{{ servicio.nombre }}</a></li>
+            <li><i class="fas fa-chevron-right text-sm"></i></li>
+            <li class="text-blue-600 font-medium">Reservar</li>
+        </ol>
+    </nav>
+    
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white mb-8 shadow-xl">
+            <h1 class="text-3xl font-bold mb-2">Reservar {{ servicio.nombre }}</h1>
+            <p class="text-blue-100">Completa el formulario para confirmar tu reservación</p>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Formulario -->
+            <div class="lg:col-span-2">
+                <form method="POST" id="reservacion-form" class="bg-white rounded-xl shadow-lg p-8">
+                    {% csrf_token %}
+                    
+                    <!-- Paso 1: Fecha -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                            <span class="bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center mr-3">1</span>
+                            Selecciona la Fecha
+                        </h3>
+                        <div class="relative">
+                            <i class="fas fa-calendar absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="date" name="fecha" id="fecha-input" required
+                                   min="{{ today|date:'Y-m-d' }}"
+                                   class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        </div>
+                    </div>
+                    
+                    <!-- Paso 2: Horario -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                            <span class="bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center mr-3">2</span>
+                            Selecciona el Horario
+                        </h3>
+                        
+                        <!-- Loader -->
+                        <div id="horarios-loader" class="hidden text-center py-8">
+                            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                            <p class="text-gray-600 mt-4">Cargando horarios disponibles...</p>
+                        </div>
+                        
+                        <!-- Mensaje cuando no hay fecha seleccionada -->
+                        <div id="no-fecha-message" class="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                            <i class="fas fa-calendar-day text-gray-300 text-5xl mb-4"></i>
+                            <p class="text-gray-600">Selecciona una fecha para ver los horarios disponibles</p>
+                        </div>
+                        
+                        <!-- Grid de horarios -->
+                        <div id="horarios-grid" class="hidden grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                            <!-- Los horarios se cargarán dinámicamente aquí -->
+                        </div>
+                        
+                        <!-- Mensaje de no hay horarios -->
+                        <div id="no-horarios-message" class="hidden bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                            <i class="fas fa-exclamation-triangle text-yellow-500 text-4xl mb-3"></i>
+                            <p class="text-yellow-800 font-medium">No hay horarios disponibles para esta fecha</p>
+                            <p class="text-yellow-700 text-sm mt-2">Por favor, selecciona otra fecha</p>
+                        </div>
+                        
+                        <input type="hidden" name="hora_inicio" id="hora-input" required>
+                    </div>
+                    
+                    <!-- Paso 3: Información Personal -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                            <span class="bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center mr-3">3</span>
+                            Tu Información
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-user mr-2 text-blue-500"></i>Nombre Completo *
+                                </label>
+                                <input type="text" name="nombre_cliente" required
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                       placeholder="Juan Pérez">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-envelope mr-2 text-blue-500"></i>Email *
+                                </label>
+                                <input type="email" name="email_cliente" required
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                       placeholder="juan@example.com">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-phone mr-2 text-blue-500"></i>Teléfono *
+                                </label>
+                                <input type="tel" name="telefono_cliente" required
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                       placeholder="0999999999">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-users mr-2 text-blue-500"></i>Número de Personas *
+                                </label>
+                                <input type="number" name="numero_personas" min="1" max="{{ servicio.capacidad_maxima }}" value="1" required
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-comment-alt mr-2 text-blue-500"></i>Notas Adicionales (Opcional)
+                            </label>
+                            <textarea name="notas" rows="3"
+                                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                      placeholder="¿Algún requerimiento especial?"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Términos y Condiciones -->
+                    <div class="mb-6">
+                        <label class="flex items-start">
+                            <input type="checkbox" required class="mt-1 mr-3 h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <span class="text-sm text-gray-700">
+                                Acepto los <a href="#" class="text-blue-600 hover:underline">términos y condiciones</a> y la 
+                                <a href="#" class="text-blue-600 hover:underline">política de cancelación</a>
+                            </span>
+                        </label>
+                    </div>
+                    
+                    <!-- Botón de Envío -->
+                    <button type="submit" id="submit-button"
+                            class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-check-circle mr-2"></i>Confirmar Reservación
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Resumen (Sidebar) -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-xl shadow-lg p-6 sticky top-24">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Resumen de Reservación</h3>
+                    
+                    <!-- Servicio -->
+                    <div class="mb-4 pb-4 border-b">
+                        <p class="text-sm text-gray-600 mb-1">Servicio</p>
+                        <p class="font-semibold text-gray-800">{{ servicio.nombre }}</p>
+                    </div>
+                    
+                    <!-- Fecha seleccionada -->
+                    <div class="mb-4 pb-4 border-b">
+                        <p class="text-sm text-gray-600 mb-1">
+                            <i class="fas fa-calendar mr-2 text-blue-500"></i>Fecha
+                        </p>
+                        <p id="resumen-fecha" class="font-semibold text-gray-800">No seleccionada</p>
+                    </div>
+                    
+                    <!-- Hora seleccionada -->
+                    <div class="mb-4 pb-4 border-b">
+                        <p class="text-sm text-gray-600 mb-1">
+                            <i class="fas fa-clock mr-2 text-blue-500"></i>Horario
+                        </p>
+                        <p id="resumen-hora" class="font-semibold text-gray-800">No seleccionado</p>
+                    </div>
+                    
+                    <!-- Duración -->
+                    <div class="mb-4 pb-4 border-b">
+                        <p class="text-sm text-gray-600 mb-1">
+                            <i class="fas fa-hourglass-half mr-2 text-blue-500"></i>Duración
+                        </p>
+                        <p class="font-semibold text-gray-800">{{ servicio.duracion_minutos }} minutos</p>
+                    </div>
+                    
+                    <!-- Precio -->
+                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4">
+                        <p class="text-sm text-gray-600 mb-2">Total a Pagar</p>
+                        <p class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                            ${{ servicio.precio }}
+                        </p>
+                    </div>
+                    
+                    <!-- Política de Cancelación -->
+                    <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <p class="text-xs text-yellow-800">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <strong>Política de cancelación:</strong> Puedes cancelar hasta 24 horas antes sin costo.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const servicioId = {{ servicio.id }};
+    const fechaInput = document.getElementById('fecha-input');
+    const horariosGrid = document.getElementById('horarios-grid');
+    const horariosLoader = document.getElementById('horarios-loader');
+    const noFechaMessage = document.getElementById('no-fecha-message');
+    const noHorariosMessage = document.getElementById('no-horarios-message');
+    const horaInput = document.getElementById('hora-input');
+    const submitButton = document.getElementById('submit-button');
+    
+    // Configurar fecha mínima (mañana)
+    const today = new Date();
+    today.setDate(today.getDate() + 1); // Mínimo mañana
+    const minDate = today.toISOString().split('T')[0];
+    fechaInput.setAttribute('min', minDate);
+    
+    // Configurar fecha máxima (3 meses adelante)
+    const maxDate = new Date();
+    maxDate.setMonth(maxDate.getMonth() + 3);
+    fechaInput.setAttribute('max', maxDate.toISOString().split('T')[0]);
+    
+    // Actualizar resumen de fecha
+    fechaInput.addEventListener('change', function() {
+        const fecha = new Date(this.value + 'T00:00:00');
+        const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const fechaFormateada = fecha.toLocaleDateString('es-EC', opciones);
+        document.getElementById('resumen-fecha').textContent = fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
+        
+        // Cargar horarios disponibles
+        cargarHorarios(this.value);
+    });
+    
+    // Función para cargar horarios disponibles
+    async function cargarHorarios(fecha) {
+        // Ocultar todo
+        noFechaMessage.classList.add('hidden');
+        horariosGrid.classList.add('hidden');
+        noHorariosMessage.classList.add('hidden');
+        horariosLoader.classList.remove('hidden');
+        
+        // Limpiar selección anterior
+        horaInput.value = '';
+        document.getElementById('resumen-hora').textContent = 'No seleccionado';
+        
+        try {
+            const response = await fetch(`/reservaciones/api/horarios/${servicioId}/?fecha=${fecha}`);
+            const data = await response.json();
+            
+            horariosLoader.classList.add('hidden');
+            
+            if (data.horarios && data.horarios.length > 0) {
+                horariosGrid.classList.remove('hidden');
+                horariosGrid.innerHTML = '';
+                
+                data.horarios.forEach(horario => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'horario-btn px-4 py-3 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-sm font-medium text-gray-700 hover:text-blue-600';
+                    button.textContent = horario.hora;
+                    button.dataset.hora = horario.hora;
+                    
+                    button.addEventListener('click', function() {
+                        // Remover selección anterior
+                        document.querySelectorAll('.horario-btn').forEach(btn => {
+                            btn.classList.remove('bg-blue-500', 'text-white', 'border-blue-500');
+                            btn.classList.add('border-gray-300', 'text-gray-700');
+                        });
+                        
+                        // Marcar como seleccionado
+                        this.classList.add('bg-blue-500', 'text-white', 'border-blue-500');
+                        this.classList.remove('border-gray-300', 'text-gray-700');
+                        
+                        // Actualizar input oculto y resumen
+                        horaInput.value = this.dataset.hora;
+                        document.getElementById('resumen-hora').textContent = this.dataset.hora;
+                    });
+                    
+                    horariosGrid.appendChild(button);
+                });
+            } else {
+                noHorariosMessage.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Error al cargar horarios:', error);
+            horariosLoader.classList.add('hidden');
+            alert('Error al cargar los horarios. Por favor, intenta de nuevo.');
+        }
+    }
+    
+    // Validación del formulario
+    document.getElementById('reservacion-form').addEventListener('submit', function(e) {
+        if (!horaInput.value) {
+            e.preventDefault();
+            alert('Por favor, selecciona un horario');
+            return false;
+        }
+        
+        // Deshabilitar botón para evitar doble envío
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Procesando...';
+    });
+</script>
+{% endblock %}

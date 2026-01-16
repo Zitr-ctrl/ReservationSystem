@@ -1,0 +1,216 @@
+{% extends 'reservaciones/base.html' %}
+
+{% block title %}Crear Cuenta - ReservaYa{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto fade-in">
+    <div class="bg-white rounded-2xl shadow-xl p-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 mb-4">
+                <i class="fas fa-user-plus text-white text-2xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800">Crear Cuenta</h1>
+            <p class="text-gray-600 mt-2">Únete a ReservaYa y comienza a reservar</p>
+        </div>
+
+        <!-- Formulario -->
+        <form method="post" id="registro-form" novalidate>
+            {% csrf_token %}
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- Nombre -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-user mr-2 text-blue-500"></i>Nombre *
+                    </label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}
+                        <p class="text-red-500 text-xs mt-1">
+                            <i class="fas fa-exclamation-circle mr-1"></i>{{ form.first_name.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <!-- Apellido -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-user mr-2 text-blue-500"></i>Apellido *
+                    </label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}
+                        <p class="text-red-500 text-xs mt-1">
+                            <i class="fas fa-exclamation-circle mr-1"></i>{{ form.last_name.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Email -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-envelope mr-2 text-blue-500"></i>Correo Electrónico *
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <p class="text-red-500 text-xs mt-1">
+                        <i class="fas fa-exclamation-circle mr-1"></i>{{ form.email.errors.0 }}
+                    </p>
+                {% endif %}
+            </div>
+
+            <!-- Usuario -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-at mr-2 text-blue-500"></i>Nombre de Usuario *
+                </label>
+                {{ form.username }}
+                <p class="text-xs text-gray-500 mt-1">
+                    <i class="fas fa-info-circle mr-1"></i>Solo letras, números y los caracteres @/./+/-/_
+                </p>
+                {% if form.username.errors %}
+                    <p class="text-red-500 text-xs mt-1">
+                        <i class="fas fa-exclamation-circle mr-1"></i>{{ form.username.errors.0 }}
+                    </p>
+                {% endif %}
+            </div>
+
+            <!-- Contraseña -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-lock mr-2 text-blue-500"></i>Contraseña *
+                    </label>
+                    {{ form.password1 }}
+                    {% if form.password1.errors %}
+                        <p class="text-red-500 text-xs mt-1">
+                            <i class="fas fa-exclamation-circle mr-1"></i>{{ form.password1.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-lock mr-2 text-blue-500"></i>Confirmar Contraseña *
+                    </label>
+                    {{ form.password2 }}
+                    {% if form.password2.errors %}
+                        <p class="text-red-500 text-xs mt-1">
+                            <i class="fas fa-exclamation-circle mr-1"></i>{{ form.password2.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Requisitos de contraseña -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-900 mb-2">
+                    <i class="fas fa-shield-alt mr-2"></i>Requisitos de contraseña:
+                </p>
+                <ul class="text-xs text-blue-800 space-y-1">
+                    <li class="flex items-start">
+                        <i class="fas fa-check mr-2 mt-1 text-blue-600"></i>
+                        <span>Mínimo 8 caracteres</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check mr-2 mt-1 text-blue-600"></i>
+                        <span>No puede ser completamente numérica</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check mr-2 mt-1 text-blue-600"></i>
+                        <span>No puede ser muy común (ej: password123)</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check mr-2 mt-1 text-blue-600"></i>
+                        <span>No puede ser similar a tu información personal</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Términos y condiciones -->
+            <div class="mb-6">
+                <label class="flex items-start">
+                    <input type="checkbox" required class="mt-1 mr-3 h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <span class="text-sm text-gray-700">
+                        Acepto los <a href="#" class="text-blue-600 hover:underline font-medium">términos y condiciones</a> 
+                        y la <a href="#" class="text-blue-600 hover:underline font-medium">política de privacidad</a> de ReservaYa
+                    </span>
+                </label>
+            </div>
+
+            <!-- Botón de registro -->
+            <button type="submit"
+                    class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-200">
+                <i class="fas fa-user-plus mr-2"></i>Crear Cuenta
+            </button>
+        </form>
+
+        <!-- Separador -->
+        <div class="relative my-8">
+            <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-gray-300"></div>
+            </div>
+            <div class="relative flex justify-center text-sm">
+                <span class="px-4 bg-white text-gray-500">o</span>
+            </div>
+        </div>
+
+        <!-- Link a login -->
+        <div class="text-center">
+            <p class="text-gray-600">
+                ¿Ya tienes una cuenta? 
+                <a href="{% url 'login' %}" class="text-blue-600 hover:underline font-semibold">
+                    Iniciar Sesión
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Beneficios -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+        <div class="bg-white rounded-xl shadow-md p-6 text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-4">
+                <i class="fas fa-calendar-check text-blue-600 text-xl"></i>
+            </div>
+            <h3 class="font-semibold text-gray-800 mb-2">Reserva Fácil</h3>
+            <p class="text-sm text-gray-600">Reserva tus servicios en minutos</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6 text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-100 mb-4">
+                <i class="fas fa-bell text-purple-600 text-xl"></i>
+            </div>
+            <h3 class="font-semibold text-gray-800 mb-2">Notificaciones</h3>
+            <p class="text-sm text-gray-600">Recibe recordatorios automáticos</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6 text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mb-4">
+                <i class="fas fa-history text-green-600 text-xl"></i>
+            </div>
+            <h3 class="font-semibold text-gray-800 mb-2">Historial</h3>
+            <p class="text-sm text-gray-600">Accede a tu historial completo</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Validación en tiempo real (opcional)
+    document.getElementById('registro-form').addEventListener('submit', function(e) {
+        const password1 = document.querySelector('input[name="password1"]').value;
+        const password2 = document.querySelector('input[name="password2"]').value;
+        
+        if (password1 !== password2) {
+            e.preventDefault();
+            alert('Las contraseñas no coinciden');
+            return false;
+        }
+        
+        if (password1.length < 8) {
+            e.preventDefault();
+            alert('La contraseña debe tener al menos 8 caracteres');
+            return false;
+        }
+    });
+</script>
+{% endblock %}
