@@ -9,8 +9,10 @@ urlpatterns = [
     path('mis-reservaciones/', views.mis_reservaciones, name='mis_reservaciones'),
     path('reservacion/<int:reservacion_id>/cancelar/', views.cancelar_reservacion, name='cancelar_reservacion'),
     path('registro/', views.registro, name='registro'),
-     # Nuevas rutas de pago
+    
+    # Rutas de pago con Stripe
     path('reservacion/<int:reservacion_id>/pagar/', views.procesar_pago, name='procesar_pago'),
-    path('pago/respuesta/', views.respuesta_pago, name='respuesta_pago'),
+    path('pago/exito/<int:reservacion_id>/', views.pago_exitoso, name='pago_exitoso'),
     path('pago/cancelado/<int:reservacion_id>/', views.pago_cancelado, name='pago_cancelado'),
+    path('webhook/stripe/', views.stripe_webhook, name='stripe_webhook'),
 ]

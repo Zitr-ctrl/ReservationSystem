@@ -26,7 +26,16 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'jakob-tetrahedral-photomechanically.ngrok-free.dev',  # Tu dominio de ngrok
+    '.ngrok-free.app',  # Acepta cualquier dominio de ngrok
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://jakob-tetrahedral-photomechanically.ngrok-free.dev",
+]
 
 
 # Application definition
@@ -141,10 +150,10 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'lista_servicios'
 LOGOUT_REDIRECT_URL = 'lista_servicios'
 
-# Configuración de PayPhone
-PAYPHONE_TOKEN = config('PAYPHONE_TOKEN')
-PAYPHONE_STORE_ID = config('PAYPHONE_STORE_ID')
-PAYPHONE_API_URL = 'https://pay.payphonetodoesposible.com/api'
+# Configuración de Stripe
+STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY', default='')
+STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
+STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
 
 # URLs de retorno
 SITE_URL = config('SITE_URL', default='http://127.0.0.1:8000')

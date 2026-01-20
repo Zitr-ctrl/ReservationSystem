@@ -2,17 +2,20 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime, timedelta, time
 from django.utils import timezone
-from .models import Servicio, Reservacion, HorarioDisponible
 from django.contrib.auth.models import User 
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login, authenticate
 from django import forms
-from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+import stripe
+import json
+
 from .models import Servicio, Reservacion, HorarioDisponible
-from .services.payphone_service import PayPhoneService
+from .services.stripe_service import StripeService
 
 
 def lista_servicios(request):
@@ -22,12 +25,14 @@ def lista_servicios(request):
         'servicios': servicios
     })
 
+
 def detalle_servicio(request, servicio_id):
     """Detalle de un servicio específico"""
     servicio = get_object_or_404(Servicio, id=servicio_id, activo=True)
     return render(request, 'reservaciones/detalle_servicio.html', {
         'servicio': servicio
     })
+
 
 @login_required
 def crear_reservacion(request, servicio_id):
@@ -102,6 +107,7 @@ def crear_reservacion(request, servicio_id):
         'today': timezone.now().date()
     })
 
+
 def obtener_horarios_disponibles(request, servicio_id):
     """API para obtener horarios disponibles (AJAX)"""
     servicio = get_object_or_404(Servicio, id=servicio_id)
@@ -153,6 +159,7 @@ def obtener_horarios_disponibles(request, servicio_id):
     
     return JsonResponse({'horarios': horarios_disponibles})
 
+
 @login_required
 def mis_reservaciones(request):
     """Ver las reservaciones del usuario"""
@@ -163,6 +170,7 @@ def mis_reservaciones(request):
     return render(request, 'reservaciones/mis_reservaciones.html', {
         'reservaciones': reservaciones
     })
+
 
 @login_required
 def cancelar_reservacion(request, reservacion_id):
@@ -182,6 +190,7 @@ def cancelar_reservacion(request, reservacion_id):
     return render(request, 'reservaciones/cancelar_reservacion.html', {
         'reservacion': reservacion
     })
+
 
 # Formulario de registro personalizado
 class RegistroForm(UserCreationForm):
@@ -266,27 +275,10 @@ def registro(request):
     
     return render(request, 'registration/registro.html', {'form': form})
 
-def puede_cancelar(self):
-    """Verificar si la reservación puede ser cancelada (ej: 24h antes)"""
-    from datetime import datetime, timedelta
-    from django.utils import timezone
-    
-    # Combinar fecha y hora de la reservación
-    fecha_hora_reserva = datetime.combine(self.fecha, self.hora_inicio)
-    
-    # Hacer la fecha timezone-aware
-    if timezone.is_naive(fecha_hora_reserva):
-        fecha_hora_reserva = timezone.make_aware(fecha_hora_reserva)
-    
-    # Calcular 24 horas antes de la reservación
-    limite_cancelacion = fecha_hora_reserva - timedelta(hours=24)
-    
-    # Comparar con el momento actual
-    return timezone.now() < limite_cancelacion
 
 @login_required
 def procesar_pago(request, reservacion_id):
-    """Procesar el pago de una reservación"""
+    """Procesar el pago de una reservación con Stripe"""
     reservacion = get_object_or_404(Reservacion, id=reservacion_id, usuario=request.user)
     
     # Verificar que la reservación no esté pagada
@@ -294,59 +286,59 @@ def procesar_pago(request, reservacion_id):
         messages.info(request, 'Esta reservación ya está pagada.')
         return redirect('mis_reservaciones')
     
-    # Crear el pago con PayPhone
-    payphone = PayPhoneService()
-    resultado = payphone.crear_pago(reservacion)
+    # Crear sesión de checkout con Stripe
+    stripe_service = StripeService()
+    
+    # URLs de retorno - USANDO SITE_URL del settings
+    base_url = settings.SITE_URL.rstrip('/')  # Quitar barra final si existe
+    success_url = f"{base_url}/reservaciones/pago/exito/{reservacion.id}/"
+    cancel_url = f"{base_url}/reservaciones/pago/cancelado/{reservacion.id}/"
+    
+    # Debug - Ver las URLs generadas
+    print(f"Success URL: {success_url}")
+    print(f"Cancel URL: {cancel_url}")
+    
+    resultado = stripe_service.crear_checkout_session(
+        reservacion=reservacion,
+        success_url=success_url,
+        cancel_url=cancel_url
+    )
     
     if resultado['success']:
-        # Guardar el ID de transacción
-        reservacion.transaccion_id = resultado['transaction_id']
+        # Guardar el session_id
+        reservacion.transaccion_id = resultado['session_id']
         reservacion.estado_pago = 'procesando'
         reservacion.save()
         
-        # Redirigir al link de pago
-        return redirect(resultado['payment_url'])
+        # Redirigir al checkout de Stripe
+        return redirect(resultado['checkout_url'])
     else:
         messages.error(request, f'Error al procesar el pago: {resultado["error"]}')
+        print(f"Error de Stripe: {resultado['error']}")  # Debug
         return redirect('mis_reservaciones')
 
-
-@csrf_exempt
-def respuesta_pago(request):
-    """Webhook para recibir respuesta de PayPhone"""
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            transaction_id = data.get('transactionId')
-            client_transaction_id = data.get('clientTransactionId')
-            
-            # Extraer ID de reservación
-            reservacion_id = client_transaction_id.replace('RES-', '')
-            reservacion = Reservacion.objects.get(id=reservacion_id)
-            
-            # Verificar el pago
-            payphone = PayPhoneService()
-            verificacion = payphone.verificar_pago(transaction_id)
-            
-            if verificacion['success'] and verificacion['status'] == 3:  # 3 = Aprobado
-                reservacion.estado_pago = 'pagado'
-                reservacion.estado = 'confirmada'
-                reservacion.fecha_pago = timezone.now()
-                reservacion.metodo_pago = 'PayPhone'
-                reservacion.save()
-                
-                messages.success(request, '¡Pago procesado exitosamente! Tu reservación ha sido confirmada.')
-            else:
-                reservacion.estado_pago = 'fallido'
-                reservacion.save()
-                messages.error(request, 'El pago no pudo ser procesado. Intenta de nuevo.')
-            
-            return redirect('mis_reservaciones')
-        
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+@login_required
+def pago_exitoso(request, reservacion_id):
+    """Página de confirmación después de pago exitoso"""
+    reservacion = get_object_or_404(Reservacion, id=reservacion_id, usuario=request.user)
     
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
+    # Verificar el pago con Stripe
+    if reservacion.transaccion_id:
+        stripe_service = StripeService()
+        verificacion = stripe_service.verificar_pago(reservacion.transaccion_id)
+        
+        if verificacion['success'] and verificacion['status'] == 'paid':
+            reservacion.estado_pago = 'pagado'
+            reservacion.estado = 'confirmada'
+            reservacion.fecha_pago = timezone.now()
+            reservacion.metodo_pago = 'Stripe'
+            reservacion.save()
+            
+            messages.success(request, '¡Pago procesado exitosamente! Tu reservación ha sido confirmada.')
+        else:
+            messages.warning(request, 'El pago está siendo procesado. Te notificaremos cuando se confirme.')
+    
+    return redirect('mis_reservaciones')
 
 
 @login_required
@@ -354,5 +346,66 @@ def pago_cancelado(request, reservacion_id):
     """Cuando el usuario cancela el pago"""
     reservacion = get_object_or_404(Reservacion, id=reservacion_id, usuario=request.user)
     
+    # Actualizar estado
+    reservacion.estado_pago = 'pendiente'
+    reservacion.save()
+    
     messages.warning(request, 'El pago fue cancelado. Puedes intentar de nuevo cuando desees.')
     return redirect('mis_reservaciones')
+
+
+@csrf_exempt
+def stripe_webhook(request):
+    """Webhook para recibir eventos de Stripe"""
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError as e:
+        # Payload inválido
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError as e:
+        # Firma inválida
+        return HttpResponse(status=400)
+    
+    # Manejar el evento
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        
+        # Obtener reservación
+        reservacion_id = session['metadata']['reservacion_id']
+        
+        try:
+            reservacion = Reservacion.objects.get(id=reservacion_id)
+            
+            # Actualizar reservación
+            reservacion.estado_pago = 'pagado'
+            reservacion.estado = 'confirmada'
+            reservacion.fecha_pago = timezone.now()
+            reservacion.metodo_pago = 'Stripe'
+            reservacion.referencia_pago = session.get('payment_intent')
+            reservacion.save()
+            
+        except Reservacion.DoesNotExist:
+            pass
+    
+    elif event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        # Manejar pago exitoso
+        pass
+    
+    elif event['type'] == 'payment_intent.payment_failed':
+        payment_intent = event['data']['object']
+        # Manejar pago fallido
+        try:
+            reservacion_id = payment_intent['metadata']['reservacion_id']
+            reservacion = Reservacion.objects.get(id=reservacion_id)
+            reservacion.estado_pago = 'fallido'
+            reservacion.save()
+        except:
+            pass
+    
+    return HttpResponse(status=200)

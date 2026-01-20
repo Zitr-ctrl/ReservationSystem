@@ -100,19 +100,6 @@
                             
                             <!-- Acciones -->
                             <div class="space-y-2">
-                                {% if reservacion.estado == 'pendiente' or reservacion.estado == 'confirmada' %}
-                                    {% if reservacion.puede_cancelar %}
-                                        <a href="{% url 'cancelar_reservacion' reservacion.id %}" 
-                                           class="block w-full text-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">
-                                            <i class="fas fa-times mr-2"></i>Cancelar
-                                        </a>
-                                    {% else %}
-                                        <button disabled 
-                                                class="block w-full text-center px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed text-sm font-medium">
-                                            <i class="fas fa-lock mr-2"></i>No Cancelable
-                                        </button>
-                                    {% endif %}
-                                {% endif %}
                                 
                                 <button onclick="verDetalles({{ reservacion.id }})" 
                                         class="block w-full text-center px-4 py-2 border-2 border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium">
@@ -124,18 +111,23 @@
                             {% if reservacion.estado_pago != 'pagado' %}
                                 {% if reservacion.estado == 'pendiente' or reservacion.estado == 'confirmada' %}
                                     <a href="{% url 'procesar_pago' reservacion.id %}" 
-                                    class="block w-full text-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium">
-                                        <i class="fas fa-credit-card mr-2"></i>Pagar Ahora
+                                    class="block w-full text-center px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all text-sm font-medium">
+                                        <i class="fas fa-credit-card mr-2"></i>Pagar con Stripe
                                     </a>
                                 {% endif %}
                             {% else %}
                                 <div class="block w-full text-center px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
-                                    <i class="fas fa-check-circle mr-2"></i>Pagado
+                                    <i class="fas fa-check-circle mr-2"></i>Pagado - ${reservacion.precio_total}
                                 </div>
+                                {% if reservacion.fecha_pago %}
+                                    <p class="text-xs text-gray-500 text-center">
+                                        Pagado el {{ reservacion.fecha_pago|date:"d/m/Y H:i" }}
+                                    </p>
+                                {% endif %}
                             {% endif %}
                             
                             {% if reservacion.estado == 'pendiente' or reservacion.estado == 'confirmada' %}
-                                {% if reservacion.puede_cancelar %}
+                                {% if reservacion.puede_cancelar and reservacion.estado_pago != 'pagado' %}
                                     <a href="{% url 'cancelar_reservacion' reservacion.id %}" 
                                     class="block w-full text-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">
                                         <i class="fas fa-times mr-2"></i>Cancelar
