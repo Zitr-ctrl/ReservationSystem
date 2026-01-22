@@ -112,7 +112,7 @@
                                 {% if reservacion.estado == 'pendiente' or reservacion.estado == 'confirmada' %}
                                     <a href="{% url 'procesar_pago' reservacion.id %}" 
                                     class="block w-full text-center px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all text-sm font-medium">
-                                        <i class="fas fa-credit-card mr-2"></i>Pagar con Stripe
+                                        <i class="fas fa-credit-card mr-2"></i>Pagar con Payhone
                                     </a>
                                 {% endif %}
                             {% else %}

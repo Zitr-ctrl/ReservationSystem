@@ -150,10 +150,13 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'lista_servicios'
 LOGOUT_REDIRECT_URL = 'lista_servicios'
 
-# Configuración de Stripe
-STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY', default='')
-STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
-STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
+# PayPhone Configuration
+PAYPHONE_TOKEN = config('PAYPHONE_TOKEN')
+PAYPHONE_STORE_ID = config('PAYPHONE_STORE_ID')
+PAYPHONE_API_URL = config('PAYPHONE_API_URL')
 
 # URLs de retorno
 SITE_URL = config('SITE_URL', default='http://127.0.0.1:8000')
+
+# Referrer Policy para PayPhone
+SECURE_REFERRER_POLICY = 'origin-when-cross-origin'

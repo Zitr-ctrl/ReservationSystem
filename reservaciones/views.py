@@ -11,11 +11,10 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login, authenticate
 from django import forms
 from django.conf import settings
-import stripe
 import json
 
 from .models import Servicio, Reservacion, HorarioDisponible
-from .services.stripe_service import StripeService
+from .services.payphone_service import PayPhoneService
 
 
 def lista_servicios(request):
@@ -276,9 +275,13 @@ def registro(request):
     return render(request, 'registration/registro.html', {'form': form})
 
 
+# ============================================================
+# VISTAS DE PAGO CON PAYPHONE
+# ============================================================
+
 @login_required
 def procesar_pago(request, reservacion_id):
-    """Procesar el pago de una reservación con Stripe"""
+    """Procesar el pago de una reservación con PayPhone"""
     reservacion = get_object_or_404(Reservacion, id=reservacion_id, usuario=request.user)
     
     # Verificar que la reservación no esté pagada
@@ -286,126 +289,109 @@ def procesar_pago(request, reservacion_id):
         messages.info(request, 'Esta reservación ya está pagada.')
         return redirect('mis_reservaciones')
     
-    # Crear sesión de checkout con Stripe
-    stripe_service = StripeService()
+    # Crear pago con PayPhone
+    payphone_service = PayPhoneService()
     
-    # URLs de retorno - USANDO SITE_URL del settings
-    base_url = settings.SITE_URL.rstrip('/')  # Quitar barra final si existe
-    success_url = f"{base_url}/reservaciones/pago/exito/{reservacion.id}/"
+    # URLs de retorno
+    base_url = settings.SITE_URL.rstrip('/')
+    return_url = f"{base_url}/reservaciones/pago/confirmacion/"
     cancel_url = f"{base_url}/reservaciones/pago/cancelado/{reservacion.id}/"
     
-    # Debug - Ver las URLs generadas
-    print(f"Success URL: {success_url}")
+    # Debug
+    print(f"Return URL: {return_url}")
     print(f"Cancel URL: {cancel_url}")
     
-    resultado = stripe_service.crear_checkout_session(
+    resultado = payphone_service.crear_pago(
         reservacion=reservacion,
-        success_url=success_url,
+        return_url=return_url,
         cancel_url=cancel_url
     )
     
     if resultado['success']:
-        # Guardar el session_id
-        reservacion.transaccion_id = resultado['session_id']
+        # Guardar el client_transaction_id
+        reservacion.transaccion_id = resultado.get('client_transaction_id')
         reservacion.estado_pago = 'procesando'
         reservacion.save()
         
-        # Redirigir al checkout de Stripe
-        return redirect(resultado['checkout_url'])
+        # Redirigir al checkout de PayPhone
+        return redirect(resultado['payment_url'])
     else:
         messages.error(request, f'Error al procesar el pago: {resultado["error"]}')
-        print(f"Error de Stripe: {resultado['error']}")  # Debug
+        print(f"Error de PayPhone: {resultado['error']}")
         return redirect('mis_reservaciones')
 
+
 @login_required
-def pago_exitoso(request, reservacion_id):
-    """Página de confirmación después de pago exitoso"""
-    reservacion = get_object_or_404(Reservacion, id=reservacion_id, usuario=request.user)
+def pago_confirmacion(request):
+    """
+    Página de confirmación después de PayPhone redirect
+    PayPhone envía los datos por GET
+    """
+    payphone_service = PayPhoneService()
     
-    # Verificar el pago con Stripe
-    if reservacion.transaccion_id:
-        stripe_service = StripeService()
-        verificacion = stripe_service.verificar_pago(reservacion.transaccion_id)
+    # Procesar respuesta de PayPhone
+    respuesta = payphone_service.procesar_respuesta(request.GET)
+    
+    transaction_id = respuesta.get('transaction_id')
+    client_transaction_id = respuesta.get('client_transaction_id')
+    
+    # Debug
+    print(f"PayPhone Response: {request.GET}")
+    print(f"Transaction ID: {transaction_id}")
+    print(f"Client Transaction ID: {client_transaction_id}")
+    
+    if not transaction_id or not client_transaction_id:
+        messages.error(request, 'Error: No se recibieron los datos del pago.')
+        return redirect('mis_reservaciones')
+    
+    # Extraer el ID de la reservación del client_transaction_id
+    # Formato: RES-{id}-{fecha}
+    try:
+        parts = client_transaction_id.split('-')
+        reservacion_id = int(parts[1])
+        reservacion = get_object_or_404(Reservacion, id=reservacion_id, usuario=request.user)
+    except (IndexError, ValueError) as e:
+        print(f"Error parsing client_transaction_id: {e}")
+        messages.error(request, 'Error: ID de reservación inválido.')
+        return redirect('mis_reservaciones')
+    
+    # Confirmar el pago con PayPhone
+    confirmacion = payphone_service.confirmar_pago(transaction_id, client_transaction_id)
+    
+    print(f"Confirmación PayPhone: {confirmacion}")
+    
+    if confirmacion['success'] and confirmacion['is_approved']:
+        # Pago exitoso
+        reservacion.estado_pago = 'pagado'
+        reservacion.estado = 'confirmada'
+        reservacion.fecha_pago = timezone.now()
+        reservacion.metodo_pago = 'PayPhone'
+        reservacion.referencia_pago = confirmacion.get('authorization_code', transaction_id)
+        reservacion.transaccion_id = transaction_id
+        reservacion.save()
         
-        if verificacion['success'] and verificacion['status'] == 'paid':
-            reservacion.estado_pago = 'pagado'
-            reservacion.estado = 'confirmada'
-            reservacion.fecha_pago = timezone.now()
-            reservacion.metodo_pago = 'Stripe'
-            reservacion.save()
-            
-            messages.success(request, '¡Pago procesado exitosamente! Tu reservación ha sido confirmada.')
-        else:
-            messages.warning(request, 'El pago está siendo procesado. Te notificaremos cuando se confirme.')
+        messages.success(request, '¡Pago procesado exitosamente! Tu reservación ha sido confirmada.')
+    elif confirmacion['success']:
+        # Pago no aprobado
+        status = confirmacion.get('status', 'Desconocido')
+        reservacion.estado_pago = 'fallido'
+        reservacion.save()
+        messages.warning(request, f'El pago no fue aprobado. Estado: {status}')
+    else:
+        messages.error(request, f'Error al verificar el pago: {confirmacion.get("error")}')
     
     return redirect('mis_reservaciones')
 
 
 @login_required
 def pago_cancelado(request, reservacion_id):
-    """Cuando el usuario cancela el pago"""
+    """Cuando el usuario cancela el pago en PayPhone"""
     reservacion = get_object_or_404(Reservacion, id=reservacion_id, usuario=request.user)
     
     # Actualizar estado
     reservacion.estado_pago = 'pendiente'
+    reservacion.transaccion_id = None
     reservacion.save()
     
     messages.warning(request, 'El pago fue cancelado. Puedes intentar de nuevo cuando desees.')
     return redirect('mis_reservaciones')
-
-
-@csrf_exempt
-def stripe_webhook(request):
-    """Webhook para recibir eventos de Stripe"""
-    payload = request.body
-    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
-    
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-        )
-    except ValueError as e:
-        # Payload inválido
-        return HttpResponse(status=400)
-    except stripe.error.SignatureVerificationError as e:
-        # Firma inválida
-        return HttpResponse(status=400)
-    
-    # Manejar el evento
-    if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        
-        # Obtener reservación
-        reservacion_id = session['metadata']['reservacion_id']
-        
-        try:
-            reservacion = Reservacion.objects.get(id=reservacion_id)
-            
-            # Actualizar reservación
-            reservacion.estado_pago = 'pagado'
-            reservacion.estado = 'confirmada'
-            reservacion.fecha_pago = timezone.now()
-            reservacion.metodo_pago = 'Stripe'
-            reservacion.referencia_pago = session.get('payment_intent')
-            reservacion.save()
-            
-        except Reservacion.DoesNotExist:
-            pass
-    
-    elif event['type'] == 'payment_intent.succeeded':
-        payment_intent = event['data']['object']
-        # Manejar pago exitoso
-        pass
-    
-    elif event['type'] == 'payment_intent.payment_failed':
-        payment_intent = event['data']['object']
-        # Manejar pago fallido
-        try:
-            reservacion_id = payment_intent['metadata']['reservacion_id']
-            reservacion = Reservacion.objects.get(id=reservacion_id)
-            reservacion.estado_pago = 'fallido'
-            reservacion.save()
-        except:
-            pass
-    
-    return HttpResponse(status=200)
